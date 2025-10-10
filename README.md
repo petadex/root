@@ -22,6 +22,7 @@ s3://petadex/logan
 ├── petadex.nr.seqcluster.tsv.zst        # PETAdex-nr clustering (38 MB)
 ├── # Halo Assay ===========================================================
 ├── haloAssay/
+    ├── logan.haloAssay.v250729.xlsx    # Halo Assay spreadsheet
     ├── logan.haloAssay.norm.tsv.zst    # Normalized halo assay
     ├── logan.haloAssay.raw.tsv.zst     # Raw halo assay quantification
     └── logan.haloAssay.v241123.msta.fa # Structural alignment of synth. enzy
@@ -54,3 +55,10 @@ Filtered and clustered Petadex-nr sequences (aa) from NCBI `nr`. Search query fo
 - `aws s3 cp s3://petadex/logan/petadex.nr.enz.fa.zst ./` (preferred)
 - `wget https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.nr.enz.fa.zst`
 - [Download Link](https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.nr.enz.fa.zst)
+
+# PETadex Halo Assay Data : `haloAssay/logan.haloAssay.v250729.xlsx` (3 MB)
+Halo Assay data. Raw, Noramlized/Aggregated values, and synthesized sequences.
+
+- `aws s3 cp s3://petadex/logan/haloAssay/logan.haloAssay.v250729.xlsx ./` (preferred)
+- `wget https://petadex.s3.us-east-1.amazonaws.com/logan/haloAssay/logan.haloAssay.v250729.xlsx`
+- [Download Link](https://petadex.s3.us-east-1.amazonaws.com/logan/haloAssay/logan.haloAssay.v250729.xlsx)
