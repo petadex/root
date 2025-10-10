@@ -7,6 +7,7 @@
 `PETadex.io` [[link]](https://github.com/ababaian/petadex.io/) is the repository for the `PETadex website.
 
 ## `PETadex` Bucket (s3://petadex/)
+[ Update: 2025-10-10. Bug Fix: public access available ]
 
 `PETadex-logan` sequences are hosted on S3, accessible via `aws cli`. All ORFs
 
