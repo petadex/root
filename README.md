@@ -56,7 +56,7 @@ Filtered and clustered Petadex-nr sequences (aa) from NCBI `nr`. Search query fo
 - `wget https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.nr.enz.fa.zst`
 - [Download Link](https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.nr.enz.fa.zst)
 
-# PETadex Halo Assay Data : `haloAssay/logan.haloAssay.v250729.xlsx` (3 MB)
+#### PETadex Halo Assay Data : `haloAssay/logan.haloAssay.v250729.xlsx` (3 MB)
 Halo Assay data. Raw, Noramlized/Aggregated values, and synthesized sequences.
 
 - `aws s3 cp s3://petadex/logan/haloAssay/logan.haloAssay.v250729.xlsx ./` (preferred)
