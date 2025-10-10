@@ -19,7 +19,12 @@ s3://petadex/logan
 ├── # PETadex-nr ===========================================================
 ├── petadex.nr.enz.fa.zst                # PETadex-nr Enzymes (144 MB)
 ├── petadex.nr.seq.fa.zst                # NCBI nr hits (207 MB)
-└── petadex.nr.seqcluster.tsv.zst        # PETAdex-nr clustering (38 MB)
+├── petadex.nr.seqcluster.tsv.zst        # PETAdex-nr clustering (38 MB)
+├── # Halo Assay ===========================================================
+├── haloAssay/
+    ├── logan.haloAssay.norm.tsv.zst    # Normalized halo assay
+    ├── logan.haloAssay.raw.tsv.zst     # Raw halo assay quantification
+    └── logan.haloAssay.v241123.msta.fa # Structural alignment of synth. enzy
 ```
 
 #### PETadex Logan Enzymes (clustered 90%aaid) : `petadex.logan.enz.v1.fa.zst` (18.6 GiB)
