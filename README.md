@@ -12,10 +12,29 @@
 
 ```
 s3://petadex/logan
-├── petadex.logan.all_orfs.v1.fa.zst (120.3 GiB)
-├── petadex.logan.seq.v1.fa.zst (61.4 GiB)
-└── petadex.logan.enz.v1.fa.zst (18.6 GiB)
+├── # PETadex-Logan ========================================================
+├── petadex.logan.enz.v1.fa.zst          # PETadex-Logan Enzymes (18.6 GiB)
+├── petadex.logan.seq.v1.fa.zst          # Logan Sequence Matches (61.4 GiB)
+├── petadex.logan.all_orfs.v1.fa.zst     # Logan search hits (120.3 GiB)
+├── # PETadex-nr ===========================================================
+├── petadex.nr.enz.fa.zst                # PETadex-nr Enzymes (144 MB)
+├── petadex.nr.seq.fa.zst                # NCBI nr hits (207 MB)
+└── petadex.nr.seqcluster.tsv.zst        # PETAdex-nr clustering (38 MB)
 ```
+
+#### PETadex Logan Enzymes (clustered 90%aaid) : `petadex.logan.enz.v1.fa.zst` (18.6 GiB)
+Filtered Petadex-Logan sequences (aa) clustered against NCBI `nr` centroids, and then themselves 
+
+- `aws s3 cp s3://petadex/logan/petadex.logan.enz.v1.fa.zst ./` (preferred)
+- `wget https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.enz.v1.fa.zst`
+- [Download Link](https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.enz.v1.fa.zst)
+
+#### PETadex Logan Sequences: `petadex.logan.seq.v1.fa.zst` (61.4 GiB)
+Logan sequences passing HMM-filtering and coverage criteria for inclusion.
+
+- `aws s3 cp s3://petadex/logan/petadex.logan.seq.v1.fa.zst ./` (preferred)
+- `wget https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.seq.v1.fa.zst`
+- [Download Link](https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.seq.v1.fa.zst)
 
 #### Raw Logan Sequences: `petadex.logan.all_orfs.v1.fa.zst` (120.3 GiB)
 Raw `logan` sequences (amino-acid) aligning to `petadex-nr`. For accessing the nucleotide contigs see: [Logan Contigs](https://github.com/IndexThePlanet/Logan/blob/main/Contigs.md)
@@ -24,16 +43,9 @@ Raw `logan` sequences (amino-acid) aligning to `petadex-nr`. For accessing the n
 - `wget https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.all_orfs.v1.fa.zst`
 - [Download Link](https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.all_orfs.v1.fa.zst)
 
-#### Petadex Sequences: `petadex.logan.seq.v1.fa.zst` (61.4 GiB)
-Logan sequences passing HMM-filtering and coverage criteria for inclusion.
+#### PETadex NR Enzymes (clustered 90%aaid) : `petadex.nr.enz.fa.zst` (144 MB)
+Filtered and clustered Petadex-nr sequences (aa) from NCBI `nr`. Search query for Logan.
 
-- `aws s3 cp s3://petadex/logan/petadex.logan.seq.v1.fa.zst ./` (preferred)
-- `wget https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.seq.v1.fa.zst`
-- [Download Link](https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.seq.v1.fa.zst)
-
-#### Petadex Enzymes (clustered 90%aaid) : `petadex.logan.enz.v1.fa.zst` (18.6 GiB)
-Filtered Petadex sequences clustered against NCBI `nr` centroids, and then themselves 
-
-- `aws s3 cp s3://petadex/logan/petadex.petadex.logan.enz.v1.fa.zst ./` (preferred)
-- `wget https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.enz.v1.fa.zst`
-- [Download Link](https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.logan.enz.v1.fa.zst)
+- `aws s3 cp s3://petadex/logan/petadex.nr.enz.fa.zst ./` (preferred)
+- `wget https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.nr.enz.fa.zst`
+- [Download Link](https://petadex.s3.us-east-1.amazonaws.com/logan/petadex.nr.enz.fa.zst)
