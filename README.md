@@ -1,6 +1,13 @@
-# PETadex index repo
+# PETadex Root
+Index of PETadex Project Repositories.
 
-## [PETAdexR](https://github.com/ababaian/petadexR)
+## [PETadex Wiki](https://github.com/petadex/root/wiki)
+Project documentation.
+
+## [PETadex issues](https://github.com/petadex/root/issues)
+Project Bug and Issues Tracker.
+
+## [PETadexR](https://github.com/ababaian/petadexR)
 `PETadexR` [[link]](https://github.com/ababaian/petadexR) provides `R` based data exploration and analysis tools for plastic‑degrading enzyme sequences. Leveraging petabase‑scale computational biology and high‑throughput functional genomics, PETadexR helps bioinformaticians and biologists identify, visualize, and prioritize novel PETase homologs for experimental validation.
 
 ## [PETadex.io](https://github.com/ababaian/petadex.io/) [Under construction]
