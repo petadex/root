@@ -23,11 +23,13 @@ s3://petadex/logan
 ├── petadex.logan.enz.v1.fa.zst          # PETadex-Logan Enzymes (18.6 GiB)
 ├── petadex.logan.seq.v1.fa.zst          # Logan Sequence Matches (61.4 GiB)
 ├── petadex.logan.all_orfs.v1.fa.zst     # Logan search hits (120.3 GiB)
-├── # PETadex-nr ===========================================================
-├── petadex-nr.RData                     # PETAdex-nr search set RData (879 MB)
+├── # PETadex-nr ========================================================
 ├── petadex.nr.enz.fa.zst                # PETadex-nr Enzymes (144 MB)
 ├── petadex.nr.seq.fa.zst                # NCBI nr hits (207 MB)
 ├── petadex.nr.seqcluster.tsv.zst        # PETAdex-nr clustering (38 MB)
+├── # PETadex-nr Search Query===============================================
+├── petadex.v2.fa                        # Logan-diamond search query (351 MB)
+├── petadex.v2.RData                     # PETAdex-nr search set RData (879 MB)
 ├── # Halo Assay ===========================================================
 ├── haloAssay/
     ├── logan.haloAssay.v250729.xlsx    # Halo Assay spreadsheet
