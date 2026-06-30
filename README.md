@@ -24,7 +24,7 @@ s3://petadex/logan
 ├── petadex.logan.seq.v1.fa.zst          # Logan Sequence Matches (61.4 GiB)
 ├── petadex.logan.all_orfs.v1.fa.zst     # Logan search hits (120.3 GiB)
 ├── # PETadex-nr ===========================================================
-├── petadex.nr.RData                     # PETAdex-nr search set RData (879 MB)
+├── petadex-nr.RData                     # PETAdex-nr search set RData (879 MB)
 ├── petadex.nr.enz.fa.zst                # PETadex-nr Enzymes (144 MB)
 ├── petadex.nr.seq.fa.zst                # NCBI nr hits (207 MB)
 ├── petadex.nr.seqcluster.tsv.zst        # PETAdex-nr clustering (38 MB)
