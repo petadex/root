@@ -1,0 +1,5 @@
+# Git Ignores for petadex root/scripts
+
+# R Data files
+*RData
+*Rdata
