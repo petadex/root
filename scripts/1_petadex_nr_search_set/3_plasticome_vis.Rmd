@@ -1,0 +1,147 @@
+---
+title: "3_Petadex_visualization"
+output: html_document
+date: "2025-02-01"
+---
+
+
+```{r}
+# Import Libraries
+library(dplyr)
+library(viridis)
+library(RCy3)
+library(igraph)
+library(ggplot2)
+library(forcats)
+load('petadex.v2.RData')
+```
+
+## Key Metrics
+```{r}
+paste0('PAZy: ', length(pazy$retrieved))
+paste0('nr hits (all): ', length(pro.df$qseqid) )
+paste0('nr hits (unique): ', length(pro.unq$qseqid) )
+paste0('nr+HMM (all): ', length(nr.pfam$qname) ) 
+paste0('nr+HMM (e-5 & 95% cov): ', length(nr.pfam.filt$qname) )
+paste0('petadex (all): ', length(petadex$accession) )
+paste0('petadex (90%): ', length(petadex$accession[petadex$ez_centroid]) )
+paste0('petadex (30%): ', length(petadex$accession[petadex$fm_centroid]) )       
+```
+
+## Visualize PAZY
+
+```{r}
+# Reduce pro file to "best hits" (by evalue) so they are
+# unique
+pro.df  <- pro.df[ order(pro.df$escore, decreasing = TRUE ), ]
+pro.unq <- pro.df[ !duplicated(pro.df$sseqid), ]
+
+# PAZY Summary
+pazy.df <- pazy[, c('retrieved', 'component', 'gene', 'domain', 'enzyme_name', 'substrate'), ]
+pazy.nr.count  <- data.frame(table(pro.unq$qseqid))
+pazy.df$nr.count <- pazy.nr.count$Freq[ match( pazy.df$retrieved, pazy.nr.count$Var1 ) ]
+
+pazy.nr.pident <- aggregate(pro.unq[, c('pident')],
+                            by = list(pro.unq$qseqid), mean)
+pazy.df$nr.pident <- pazy.nr.pident$x[ match( pazy.df$retrieved, pazy.nr.pident$Group.1 ) ]
+
+```
+
+
+
+```{r}
+## PAZy NR search
+pazy.df <- pazy.df[ order(pazy.df$nr.count, decreasing = T), ]
+pazy.df <- pazy.df[ order(pazy.df$domain), ]
+
+pazy.nr.xy <- ggplot( pazy.df, aes(nr.pident,
+                                   nr.count,
+                                   color = domain)) +
+  geom_point() +
+  theme_bw() + scale_y_log10() +
+  xlab("Mean pid%") +
+  ylab("Hits (N)")
+
+pazy.nr.xy
+```
+
+```{r}
+pro.df$domain <- pazy.df$domain[ match( pro.df$qseqid, pazy.df$retrieved) ]
+
+## PAZy NR search
+pazy.nr.hist <- ggplot( pro.unq, aes(pident,
+                                   fill = domain)) +
+  geom_histogram( bins = 50) +
+  theme_bw() +
+  xlab("Mean pid%") +
+  ylab("Hits (N)")
+
+pazy.nr.hist
+```
+
+
+```{r}
+# Petadex Per-Component Summary
+c.df <- pazy[ !duplicated(pazy$component) , c('component', 'gene', 'domain')]
+  c.df$cn <- paste0("c",c.df$component)
+
+  acc.count <- data.frame( table(petadex$c) )
+  c.df$Nacc <- acc.count$Freq[ match(c.df$cn, acc.count$Var1) ]
+  
+  ez.count <- data.frame( table(petadex$c[petadex$ez_centroid]) )
+  c.df$Nez <- ez.count$Freq[ match(c.df$cn, ez.count$Var1) ]
+  
+  fm.count <- data.frame( table(petadex$c[petadex$fm_centroid]) )
+  c.df$Nfm <- fm.count$Freq[ match(c.df$cn, fm.count$Var1) ]
+  
+  pz.count <- data.frame( table(petadex$c[petadex$pazy]) )
+  c.df$Npz <- pz.count$Freq[ match(c.df$cn, pz.count$Var1) ]
+  
+rm( acc.count, ez.count, fm.count, pz.count)
+
+```
+
+```{r}
+## Bar graph, per component
+c.df <- c.df[ order(c.df$Npz, decreasing = T), ]
+c.df <- c.df[ order(c.df$domain), ]
+
+bar.pazy <- ggplot( c.df, aes(fct_inorder(cn),
+                              Npz,
+                              fill = domain)) +
+  geom_bar( stat = 'identity' ) +
+  theme_bw() +
+  xlab("component") +
+  ylab("PAZy Sequences")
+
+bar.pazy
+
+bar.nr <- ggplot( c.df, aes(fct_inorder(cn),
+                              Nacc,
+                              fill = domain)) +
+  geom_bar( stat = 'identity' ) +
+  theme_bw() +
+  xlab("component") +
+  ylab("NR Sequences")
+bar.nr
+
+bar.nr90 <- ggplot( c.df, aes(fct_inorder(cn),
+                              Nez,
+                              fill = domain)) +
+  geom_bar( stat = 'identity' ) +
+  theme_bw() +
+  xlab("component") +
+  ylab("NR Sequences (90% clustered)")
+bar.nr90
+
+bar.nr30 <- ggplot( c.df, aes(fct_inorder(cn),
+                              Nfm,
+                              fill = domain)) +
+  geom_bar( stat = 'identity' ) +
+  theme_bw() +
+  xlab("component") +
+  ylab("NR Sequences (30% clustered)")
+bar.nr30
+
+
+```

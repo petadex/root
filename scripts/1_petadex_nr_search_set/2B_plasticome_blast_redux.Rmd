@@ -1,0 +1,575 @@
+---
+title: "Plasticase Enzyme Template Index (petadex)"
+output: html_document
+date: "2025-01-06"
+---
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+### STEP 1 : BLAST NR ==========================================================
+
+## Install BLAST
+# wget https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.16.0+-x64-linux.tar.gz ./
+# tar -xvf ncbi-blast-2.16.0+-x64-linux.tar.gz
+#
+# cp ncbi-blast-2.16.0+/bin/* ~/bio/bin/
+## Download BLAST nr
+# mkdir -p nr; cd nr
+# update_blastdb.pl --source aws --num_threads 4 nr
+# diamond prepdb -d nr
+
+# Align PAZy reference sequences, against BLAST nr
+
+# # Run diamond blastp
+# ~/bio/bin/diamond blastp \
+#   -q plasticome.v1.fa \
+#   -d /data/nr/nr \
+#   --very-sensitive \
+#   -p16 -k0 \
+#   -f 6 qseqid  qstart qend qlen \
+#        sseqid  sstart send slen \
+#        pident evalue bitscore \
+#   > pz.nr.pro
+
+```
+
+```{r}
+# read.pro (modified)
+#' Reads a .pro file created by 'diamond'
+#' @param pro.path relative system path to .fev file
+#' @return A diamond-pro data.frame object
+#' @keywords palmid diamond pro
+#' @examples
+#' # palmDB Alignment file (.pro)
+#' pro.path <- system.file( "extdata", "waxsys.pro", package = "palmid")
+#' pro.df <- read.pro(pro.path)
+#'
+#' @import dplyr ggplot2
+#' @export
+
+read.pro <- function(pro.path) {
+  # read fev as tsv
+  pro.df <- utils::read.csv2(pro.path, header = F, sep = "\t",
+                      stringsAsFactors=FALSE)
+
+  pro.cols <- c("qseqid", "qstart", "qend", "qlen",
+                "sseqid", "sstart", "send", "slen",
+                "pident", "evalue", "bitscore")
+    colnames(pro.df) <- pro.cols
+
+  # set df.types
+    pro.df$qseqid <- as.factor(pro.df$qseqid)
+    pro.df$qstart <- as.numeric(pro.df$qstart)
+    pro.df$qend   <- as.numeric(pro.df$qend)
+    pro.df$qlen   <- as.numeric(pro.df$qlen)
+    pro.df$sseqid <- as.character(pro.df$sseqid)
+    pro.df$sstart <- as.numeric(pro.df$sstart)
+    pro.df$send   <- as.numeric(pro.df$send)
+    pro.df$slen   <- as.numeric(pro.df$slen)
+    pro.df$pident <- as.numeric(pro.df$pident)
+    pro.df$evalue <- as.numeric(pro.df$evalue)
+    pro.df$bitscore <- as.numeric(pro.df$bitscore)
+    
+  # Initialize empty taxonomy columns (use get.palmTax)
+    pro.df$tspe <- as.character(NA)
+    pro.df$tfam <- as.character(NA)
+    pro.df$tphy <- as.character(NA)
+    
+  return(pro.df)
+}
+
+pro.df <- read.pro('blast/pz.nr.pro')
+pro.df$escore <- -log10(pro.df$evalue)
+
+```
+
+```{r}
+# Reduce pro file to "best hits" (by evalue) so they are
+# unique
+pro.df  <- pro.df[ order(pro.df$escore, decreasing = TRUE ), ]
+pro.unq <- pro.df[ !duplicated(pro.df$sseqid), ]
+```
+
+```{r}
+# # Write output of each unique BLAST output sequence
+# write.csv( pro.unq$sseqid, file = 'pz.nr.uniq.id',
+#            quote = F, row.names = FALSE, col.names = FALSE)
+
+# blastdbcmd -db nr -entry_batch ~/Desktop/plasticome/pz.nr.uniq.id \
+# -outfmt "%f" -out ~/Desktop/plasticome/pz.nr.uniq.fa.tmp
+
+# # sort is backwards here; repeat with sort  from large-->small
+# seqkit sort -lr pz.nr.uniq.fa.tmp > pz.nr.fa
+
+```
+
+
+```{r}
+### STEP 2 : HMM FILT ==========================================================
+
+```
+
+```{r}
+## Create HMM statistics File
+# hmmstat pfam_select.hmm \
+# \| sed 's/  */\t/g' - \
+# \| sed '/^#/d' - > $model.meta
+
+pfam.meta <- read.table('hmm/pfam/pfam_select.meta', header = F)
+  colnames(pfam.meta) <- c('idx', 'name', 'acc', 'nseq', 'eff_nseq',
+                           'M' ,'relent', 'info' , 'relE', 'compKL')
+
+## Search BLAST hits using HMM models
+# 
+# hmmscan \
+#   --notextw --noali --cpu 8 \
+#   --domtblout pz.nr.hmm.dtout \
+#   -o /dev/null \ 
+#   ../hmm/pfam/pfam_select.hmm \
+#   pz.nr.uniq.fa 
+
+## Parse hmmr output to TSV
+# sed 's/  */\t/g' pz.nr.hmm.dtout |\
+#  sed '/^#/d' - |\
+#  cut -f 1-23 - |
+#  > pz.nr.hmm.tsv
+
+nr.pfam <- read.table('blast/pz.nr.hmm.tsv', header = F)
+  colnames(nr.pfam) <- c('target', 'accession', 'tlen', 'query_name', 'qacc', 'qlen',
+                         'evalue', 'score', 'bias',
+                         'dnum', 'ofd', 'c-evalue', 'i-evalue', 'dscore', 'dbias',
+                         'hmmstart', 'hmmend', 'alistart', 'aliend', 'envstart', 'envend',
+                         'acc', 'description')
+
+```
+
+
+```{r}
+library(data.table)
+# Merge Domain Hits 
+
+mergeHMM <- function(dt){
+  # Convert to Data Table
+  dt <- data.table(dt)
+  
+  # Aggregate Values by Sequence-PFAM hit
+  dt2 <- dt[ , .(min(alistart), max(aliend), qlen,
+                 target, min(hmmstart), max(hmmend), tlen,
+                 evalue, score),
+             by = .(query_name, accession)]
+  
+  # Remove duplicate Rows to complete Aggregate
+  dt2 <- dt2[ !duplicated( paste0( dt2$query_name, ":", dt2$accession) ), ]
+  
+  # Retain only top PFAM hit per query sequence
+  dt2 <-dt2[ order(query_name, evalue), ]
+  dt2 <- dt2[ !duplicated(dt2$query_name), ]
+  
+  # Re-order and Rename columns
+  colnames(dt2) <- c("qname", "tacc", "alistart", "aliend", "qlen",
+                     "tname", "hmmstart", "hmmend", "tlen", "evalue", "score")
+  
+  dt2 <- dt2[, c("qname", "alistart", "aliend", "qlen",
+                 "tacc", "tname", "hmmstart", "hmmend", "tlen",
+                 "evalue", "score") ]
+  
+  # Calculate HMM model coverage (interpolate missing sequences)
+  dt2$qcov   <- (1 + (dt2$hmmend)-(dt2$hmmstart)) / (dt2$tlen)
+  dt2$escore <- -log10(dt2$evalue)  
+             
+  return(dt2)
+}
+
+
+nr.pfam <- mergeHMM(nr.pfam)
+  
+nr.pfam.filt <- nr.pfam[ (nr.pfam$evalue <= 1e-5) & (nr.pfam$qcov >= 0.95), ]
+
+```
+
+```{r}
+# Extract HMM-model hit sub-sequences only
+# from: pz.nr.uniq.fa
+hit.bed <- nr.pfam.filt[ , c("qname", "alistart", "aliend")]
+
+# write.table( hit.bed, file = 'blast/pz.nr.hmm.bed',
+#             quote = FALSE, sep = '\t', row.names = FALSE, col.names = FALSE)
+
+# bedtools getfasta -bed pz.nr.hmm.bed -fi pz.nr.fa > pz.nr.hmmfilt.fa.tmp
+#
+# seqkit sort -lr pz.nr.hmmfilt.fa.tmp >  pz.nr.hmmfilt.fa
+
+```
+
+```{r}
+### STEP 3 : MERGE + CLUSTER ===================================================
+
+### OPTION A
+# PAZy sequences with NR sequences appended
+# then clustering performed
+# This option will remove redundency in PAZy sequences from search query
+# This also treats all sequences equally, so I opt for this
+# Cluster( <PAZY> + <NR>)
+
+# cat ../plasticome.v1.fa pz.nr.hmmfilt.fa > petadex.pre2.fa
+
+# Cleaned up names too; removed bed extraction coordinates
+
+# usearch --cluster_fast petadex.pre2.fa  -id 0.90  -centroids petadex.pre2.c90.fa  -uc petadex.pre2.c90.uc
+#
+################################################################
+
+# usearch v11.0.667_i86linux64, 65.5Gb RAM, 20 cores
+# (C) Copyright 2013-18 Robert C. Edgar, all rights reserved.
+# https://drive5.com/usearch
+# 
+# License: a.babaian@utoronto.ca, non-profit use, max 1 process(es)
+# 
+# 00:06 1.0Gb   100.0% Reading petadex.pre2.fa
+# 00:06 998Mb  CPU has 20 cores, defaulting to 10 threads
+# 00:08 1.9Gb   100.0% DF
+# 00:08 2.0Gb  2736003 seqs, 2402589 uniques, 2194196 singletons (91.3%)
+# 00:08 2.0Gb  Min size 1, median 1, max 658, avg 1.14
+# 00:09 2.0Gb   100.0% DB
+# 11:39 4.1Gb   100.0% 1048586 clusters, max size 6718, avg 2.6
+# 11:49 4.1Gb   100.0% Writing centroids to petadex.pre2.c90.fa
+#                                                              
+#       Seqs  2402589 (2.4M)
+#   Clusters  1048586 (1.0M)
+#   Max size  6718
+#   Avg size  2.6
+#   Min size  1
+# Singletons  714735 (714.7k), 29.7% of seqs, 68.2% of clusters
+#    Max mem  4.1Gb
+#       Time  11:40
+# Throughput  3432.3 seqs/sec.
+
+################################################################
+
+# usearch --cluster_fast petadex.pre2.c90.fa  -id 0.30  -centroids petadex.pre2.c30.fa  -uc petadex.pre2.c30.uc
+#
+#################################################################
+
+# (C) Copyright 2013-18 Robert C. Edgar, all rights reserved.
+# https://drive5.com/usearch
+# 
+# License: a.babaian@utoronto.ca, non-profit use, max 1 process(es)
+# 
+# 00:02 425Mb   100.0% Reading petadex.pre2.c90.fa
+# 00:02 391Mb  CPU has 20 cores, defaulting to 10 threads
+# 00:03 1.2Gb   100.0% DF
+# 00:03 1.2Gb  1048586 seqs, 1048586 uniques, 1048586 singletons (100.0%)
+# 00:03 1.2Gb  Min size 1, median 1, max 1, avg 1.00
+# 00:03 1.2Gb   100.0% DB
+# 03:16 1.5Gb   100.0% 64919 clusters, max size 11814, avg 16.2
+# 03:17 1.5Gb   100.0% Writing centroids to petadex.pre2.c30.fa
+#                                                              
+#       Seqs  1048586 (1.0M)
+#   Clusters  64919 (64.9k)
+#   Max size  11814 (11.8k)
+#   Avg size  16.2
+#   Min size  1
+# Singletons  20640 (20.6k), 2.0% of seqs, 31.8% of clusters
+#    Max mem  1.5Gb
+#       Time  03:14
+# Throughput  5405.1 seqs/sec.
+
+################################################################
+#
+
+# samtools faidx petadex.pre2.fa
+# [W::fai_insert_index] Ignoring duplicate sequence "XP_036664376.1" at byte offset 95775838
+# [W::fai_insert_index] Ignoring duplicate sequence "WP_293218050.1" at byte offset 142727036
+# [W::fai_insert_index] Ignoring duplicate sequence "P13398.2" at byte offset 152325559
+# [W::fai_insert_index] Ignoring duplicate sequence "WP_348608127.1" at byte offset 204933552
+# [W::fai_insert_index] Ignoring duplicate sequence "WBR49957.1" at byte offset 291718356
+# [W::fai_insert_index] Ignoring duplicate sequence "WBR49958.1" at byte offset 291718775
+# [W::fai_insert_index] Ignoring duplicate sequence "WBR49956.1" at byte offset 297657574
+# [W::fai_insert_index] Ignoring duplicate sequence "BAF57210.1" at byte offset 309991844
+# [W::fai_insert_index] Ignoring duplicate sequence "BAF57211.1" at byte offset 314702663
+# [W::fai_insert_index] Ignoring duplicate sequence "AGT96414.1" at byte offset 335722986
+# [W::fai_insert_index] Ignoring duplicate sequence "KQR39103.1" at byte offset 451113839
+# [W::fai_insert_index] Ignoring duplicate sequence "BAF57214.1" at byte offset 491587102
+# [W::fai_insert_index] Ignoring duplicate sequence "AGT96415.1" at byte offset 554309889
+# [W::fai_insert_index] Ignoring duplicate sequence "P00780.2" at byte offset 574563751
+# [W::fai_insert_index] Ignoring duplicate sequence "ACY56506.1" at byte offset 578594943
+# [W::fai_insert_index] Ignoring duplicate sequence "P29599.1" at byte offset 610403637
+# [W::fai_insert_index] Ignoring duplicate sequence "P29600.1" at byte offset 610403888
+# [W::fai_insert_index] Ignoring duplicate sequence "P06873.2" at byte offset 705052762
+# [W::fai_insert_index] Ignoring duplicate sequence "WP_013956815.1" at byte offset 720116623
+# [W::fai_insert_index] Ignoring duplicate sequence "CAH17554.1" at byte offset 754352315
+# [W::fai_insert_index] Ignoring duplicate sequence "WP_108898647.1" at byte offset 778045734
+# [W::fai_insert_index] Ignoring duplicate sequence "RGD93181.1" at byte offset 781991733
+# [W::fai_insert_index] Ignoring duplicate sequence "SIP63154.1" at byte offset 787923552
+# [W::fai_insert_index] Ignoring duplicate sequence "MDT7859148.1" at byte offset 795721817
+# [W::fai_insert_index] Ignoring duplicate sequence "WP_013858543.1" at byte offset 798946598
+# [W::fai_insert_index] Ignoring duplicate sequence "ABY53108.1" at byte offset 803726209
+# [W::fai_insert_index] Ignoring duplicate sequence "BAC67242.1" at byte offset 819636296
+# [W::fai_insert_index] Ignoring duplicate sequence "WP_085690612.1" at byte offset 825221391
+# [W::fai_insert_index] Ignoring duplicate sequence "XAQ58225.1" at byte offset 825653003
+# [W::fai_insert_index] Ignoring duplicate sequence "QEX94755.1" at byte offset 837475141
+# [W::fai_insert_index] Ignoring duplicate sequence "KAH7127633.1" at byte offset 841588041
+# [W::fai_insert_index] Ignoring duplicate sequence "AAA33335.1" at byte offset 842216776
+# [W::fai_insert_index] Ignoring duplicate sequence "Q99174.1" at byte offset 842532046
+# [W::fai_insert_index] Ignoring duplicate sequence "WKA69984.1" at byte offset 843141272
+# [W::fai_insert_index] Ignoring duplicate sequence "ESK97883.1" at byte offset 844595386
+# [W::fai_insert_index] Ignoring duplicate sequence "WP_003460012.1" at byte offset 848956875
+# [W::fai_insert_index] Ignoring duplicate sequence "AFA45122.1" at byte offset 853839347
+# [W::fai_insert_index] Ignoring duplicate sequence "XDS72785.1" at byte offset 854573267
+# [W::fai_insert_index] Ignoring duplicate sequence "ADM47605.1" at byte offset 854577661
+# [W::fai_insert_index] Ignoring duplicate sequence "ADV92525.1" at byte offset 854578003
+# [W::fai_insert_index] Ignoring duplicate sequence "CBY05530.1" at byte offset 854584853
+# [W::fai_insert_index] Ignoring duplicate sequence "SHM40309.1" at byte offset 856310733
+# [W::fai_insert_index] Ignoring duplicate sequence "WAU86704.1" at byte offset 856317831
+# [W::fai_insert_index] Ignoring duplicate sequence "WP_044849715.1" at byte offset 859785313
+
+```
+
+```{r}
+# Assign each Filtered/Trim sequence to it's closest "Plasticome" sequence
+# ~/bio/bin/diamond makedb --db plasticome.v1 --in plasticome.v1.fa 
+
+# # Run diamond blastp
+# ~/bio/bin/diamond blastp \
+#   -q petadex.pre2.fa \
+#   -d ../plasticome.v1.dmnd \
+#   --ultra-sensitive \
+#   -p16 -k1 \
+#   -f 6 qseqid  qstart qend qlen \
+#        sseqid  sstart send slen \
+#        pident evalue bitscore \
+#   > petadex.pre2.pz.pro
+
+```
+
+
+```{r}
+# Big Friggin Clean-up of clusters
+# The end goal here is to rename each sequence in "PreV2" plasticome
+# to the format
+# <Component_#>.<UC 30 cluster id>.<UC 90 cluster id>:Accession
+
+# Load fasta header names
+# seqkit faidx plasticome.pre2.fa
+
+# <UC90 clusters>
+# nr90.hmmfiltered.uc # All NR hits clustered to 90%
+
+```
+
+
+```{r}
+
+readUC <- function(uc.path){
+
+# Type S: Centroid Representative sequence
+# Type C: Cluster_Info. Field3 is cluster size; Field9 is centroid id
+# Type N: No Hit
+# Type H: Hit. Sequence is aligned to a centroid target
+  
+# Import UClust (uc) file
+uc.dt <- read.table(file = uc.path,
+                    sep = '\t', header = F)
+
+  colnames(uc.dt) <- c('type', 'cluster_number', 'len', 'pident', 'strand', 
+                       'blank', 'blank2', 'cigar', 'accession', 'target')
+
+  uc.dt$type           <- as.factor(uc.dt$type)
+  uc.dt$cluster_number <- as.numeric( uc.dt$cluster_number )
+  uc.dt$len            <- as.numeric( uc.dt$len )
+  uc.dt$pident         <- as.numeric( uc.dt$pident )
+  uc.dt$strand         <- as.factor("na")
+  uc.dt$blank          <- as.factor("na")
+  uc.dt$blank2         <- as.factor("na")
+  uc.dt$cigar          <- as.character(uc.dt$cigar)
+  uc.dt$accession      <- as.character(uc.dt$accession)
+  uc.dt$target         <- as.character(uc.dt$target)
+  
+  uc.clus <- uc.dt[ uc.dt$type != "C", ]
+  #uc.info <- uc.dt[ uc.dt$type == "C", ] 
+  
+  return(uc.clus)
+}
+ 
+ez.uc90 <- readUC( 'blast/petadex.pre2.c90.uc' )
+fm.uc30 <- readUC( 'blast/petadex.pre2.c30.uc' )
+
+
+```
+
+
+```{r}
+# Populate petadex
+# < acc >
+# < length >
+petadex <- read.table( file = 'blast/petadex.pre2.fa.fai',
+                       sep = '\t', header = F)[ , 1:2 ]
+  colnames(petadex) <- c("accession", "length")
+
+# Assign 90% centroids <ez>
+## Match petadex accession to clustering file
+  ez.match <- match( petadex$accession, ez.uc90$accession)
+
+petadex$ez          <- paste0("ez", ez.uc90$cluster_number[ ez.match ] )
+petadex$ez_centroid <- FALSE
+petadex$ez_centroid[petadex$accession %in% ez.uc90$accession[ ez.uc90$type == 'S' ] ] <- TRUE 
+petadex$ez_pid      <- ez.uc90$pident[ ez.match ]
+petadex <- petadex[ order(petadex$ez), ]
+
+
+# Assign 30% centroids <fm>
+## Match petadex accession to clustering file
+  fm.match <- match( petadex$accession, fm.uc30$accession)
+
+petadex$fm          <- paste0("fm", fm.uc30$cluster_number[ fm.match ] )
+petadex$fm_centroid <- FALSE
+petadex$fm_centroid[petadex$accession %in% fm.uc30$accession[ fm.uc30$type == 'S' ] ] <- TRUE 
+petadex$fm_pid      <- fm.uc30$pident[ fm.match ]
+petadex$fm[ !petadex$ez_centroid ] <- NA
+
+# For each no-centroid EZ sequence, map to it's centroid
+petadex.ez_map <- match( petadex$ez[ !petadex$ez_centroid ],
+                         petadex$ez[  petadex$ez_centroid ]  )
+
+# Assign each EZ child the properties of it's FM parent
+petadex$fm[ !petadex$ez_centroid ] <- petadex$fm[ petadex$ez_centroid ][petadex.ez_map]
+
+```
+
+```{r}
+# Merge "plasticome" v1 information
+# Plasticome sequence metadata
+pazy <- read.csv('plasticome.v1.meta.csv', header = TRUE, sep = '\t')
+  pazy <- pazy[ , c('retrieved', 'component', 'gene', 'domain', 'cath',
+                          'kingdom', 'retrieved_host', 
+                          'enzyme_name', 'substrate',
+                          'pdb_accession', 'retrieved_name','reference',
+                          'rowid', 'synthesized') ]
+
+  pazy <- pazy[ !(pazy$component == "-"), ] # Drop non-retrieved sequences
+  
+  # Assign data-type (default "character")
+  pazy$rowid     <- as.numeric(pazy$rowid)
+  pazy$component <- as.numeric(pazy$component)
+
+# petadex aligned to pazy
+petadex.pre2.pz.pro <- read.pro('blast/petadex.pre2.pz.pro')
+  pro.pz.match <- match( petadex.pre2.pz.pro$sseqid, pazy$retrieved ) 
+  petadex.pre2.pz.pro$component <- pazy$component[ pro.pz.match]
+  petadex.pre2.pz.pro$gene <- pazy$gene[ pro.pz.match]
+  
+# Assign Component centroids <c>
+## Match petadex accession to clustering file
+  pz.match <- ( petadex$accession %in% pazy$retrieved )
+  petadex$pazy          <- FALSE
+  petadex$pazy[pz.match] <- TRUE
+  #c.invmatch <- match( pazy$retrieved, petadex$accession)
+  
+# For each <fm> centroid, assign it's component
+pro.match <- match( petadex$accession[ petadex$fm_centroid ], petadex.pre2.pz.pro$qseqid ) 
+  petadex$c <- NA
+  petadex$c[ petadex$fm_centroid ] <- petadex.pre2.pz.pro$component[ pro.match ]
+  petadex$c <- paste0("c", petadex$c)
+  petadex$gene[ petadex$fm_centroid ] <- petadex.pre2.pz.pro$gene[ pro.match ] 
+
+# For each no-centroid Fm sequence, map to it's centroid
+petadex.fm_map <- match( petadex$fm[ !petadex$fm_centroid ],
+                         petadex$fm[  petadex$fm_centroid ]  )
+
+# Assign each FM child the properties of it's Component parent
+petadex$c[ !petadex$fm_centroid ] <- petadex$c[ petadex$fm_centroid ][petadex.fm_map]
+petadex$gene[ !petadex$fm_centroid ] <- petadex$gene[ petadex$fm_centroid ][petadex.fm_map]
+
+```
+
+```{r}
+# Create petadex search index
+## Include sequences (1) if they are an EZ centroid (90% id)  
+## OR (2) they are a pazy full-length reference sequence
+petadex.search <- petadex[ (petadex$ez_centroid | petadex$pazy ), ]
+petadex.search$acc2 <- gsub( '\\.[0-9]*', '', petadex.search$accession )
+
+petadex.kv <- data.frame( key   = petadex.search$accession )
+
+petadex.kv$value <- paste0( petadex.search$c, "_", petadex.search$gene, ".",
+                            petadex.search$fm, ".",
+                            petadex.search$ez, ":", petadex.search$acc2 )
+
+```
+
+```{r}
+write.table(petadex.kv$key, 'blast/petadex.key',
+             sep='\t', quote = F, 
+             col.names = FALSE, row.names = FALSE)
+
+write.table(petadex.kv, 'blast/petadex.rename.key',
+             sep='\t', quote = F, 
+             col.names = FALSE, row.names = FALSE)
+
+# seqkit rmdup -n  petadex.pre2.fa | \
+# seqkit grep -f petadex.key - | \
+#   seqkit replace -p '(.*)$' -r '{kv}' -k petadex.rename.key - \
+#   > petadex.v2.fa
+
+# seqkit stats petadex.v2.fa
+## file           format  type      num_seqs      sum_len  min_len  avg_len  max_len
+## petadex.v2.fa  FASTA   Protein  1,048,671  306,402,573       36    292.2      958
+
+
+```
+
+```{r}
+# QED database is ready
+```
+
+
+```{r}
+rm( hit.bed, seqmeta, ez.match, fm.match, petadex.ez_map, petadex.fm_map,
+    pro.match, pro.pz.match, pz.match)
+```
+
+```{r}
+save( ez.uc90, fm.uc30, nr.pfam, nr.pfam.filt, pazy, petadex, petadex.kv,
+      petadex.pre2.pz.pro, petadex.search, pfam.meta, pro.df, pro.unq,
+      file = 'petadex.v2.RData')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

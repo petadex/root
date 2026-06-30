@@ -1,0 +1,367 @@
+# PETase Initial activity assay
+
+```{r}
+# Import Libraries
+library(dplyr)
+library(viridis)
+library(RCy3)
+library(igraph)
+```
+
+
+```{r}
+# usearch --cluster_fast plasticome.preclust.fa \
+#  -id 0.30 \
+#  -centroids plasticome.30.fa \
+#  -uc plasticome.30.uc
+
+# usearch v11.0.667_i86linux64, 65.5Gb RAM, 20 cores
+# (C) Copyright 2013-18 Robert C. Edgar, all rights reserved.
+# https://drive5.com/usearch
+# 
+# License: a.babaian@utoronto.ca, non-profit use, max 1 process(es)
+# 
+# 00:00 43Mb    100.0% Reading plasticome.preclust.fa
+# 00:00 9.9Mb  CPU has 20 cores, defaulting to 10 threads
+# 00:00 354Mb   100.0% DF
+# 00:00 689Mb  213 seqs, 205 uniques, 198 singletons (96.6%)
+# 00:00 689Mb  Min size 1, median 1, max 3, avg 1.04
+# 00:00 695Mb   100.0% DB
+# 00:00 762Mb   100.0% 89 clusters, max size 25, avg 2.4
+# 00:00 762Mb   100.0% Writing centroids to plasticome.30.fa
+#                                                           
+#       Seqs  205
+#   Clusters  89
+#   Max size  25
+#   Avg size  2.4
+#   Min size  1
+# Singletons  62, 30.2% of seqs, 69.7% of clusters
+#    Max mem  762Mb
+#       Time  1.00s
+# Throughput  205.0 seqs/sec.
+
+# ---------------------------------------------------------------
+
+## Import all-v-all Blast6 Output
+## query target id alnlen mism opens qlo qhi tlo thi evalue bits
+# usearch -allpairs_local plasticome.preclust.fa \
+#         -id 0.25 -evalue 0.1 \
+#         -blast6out plasticome.aln
+#
+# usearch v11.0.667_i86linux64, 65.5Gb RAM, 20 cores
+# (C) Copyright 2013-18 Robert C. Edgar, all rights reserved.
+# https://drive5.com/usearch
+#
+# License: a.babaian@utoronto.ca, non-profit use, max 1 process(es)
+#
+# 00:00 43Mb    100.0% Reading plasticome.preclust.fa
+# 00:01 12Mb    100.0% Aligning, 85.4% matched       
+
+```
+
+```{r}
+# Import all v all alignment as edges
+allpair.df <- read.csv('net/plasticome.aln', header = F, sep = '\t')
+colnames(allpair.df) <- c('query','target','id','alnlen',
+                          'mism','opens',
+                          'qlo','qhi','tlo','thi',
+                          'evalue','bits')
+allpair.df$div <- (100 - allpair.df $id )/100 
+paired.nodes <- sort(unique( c(allpair.df$query, allpair.df$target)) )
+
+# Filter edges to be
+# e-value <= 1e-5
+# pident  >= 30
+allpair.df <- allpair.df[ allpair.df$evalue <= 1e-5, ]
+allpair.df <- allpair.df[ allpair.df$id     >= 30,   ]
+```
+
+
+```{r}
+# Plasticome sequence metadata
+seqmeta <- read.csv('plasticome.v1.meta.csv', header = TRUE, sep = '\t')
+seqmeta <- seqmeta[ , c('retrieved', 'component', 'gene', 'domain', 'cath',
+                        'kingdom', 'retrieved_host', 
+                        'enzyme_name', 'substrate',
+                        'pdb_accession', 'retrieved_name','reference',
+                        'rowid', 'synthesized') ]
+
+seqmeta <- seqmeta[ !(seqmeta$component == "-"), ] # Drop non-retrieved sequences
+
+# Assign data-type (default "character")
+seqmeta$rowid     <- as.numeric(seqmeta$rowid)
+seqmeta$component <- as.numeric(seqmeta$component)
+
+```
+
+```{r}
+# Add edges to NULL node for un-paired entries, else they're dropped
+# in the igraph data.frame import function
+unpaired.nodes <- seqmeta[ !(seqmeta$retrieved %in% paired.nodes), ]
+append.unpaired <- data.frame( query = unpaired.nodes$retrieved,
+                               target = 'tmp',
+                               id = 0, alnlen = 0, mism = 0, opens = 0,
+                               qlo = 0, qhi = 0, tlo = 0, thi = 0,
+                               evalue = 0, bits = 0, div = 0)
+  allpair.df <- rbind( allpair.df, append.unpaired)
+
+  seqmeta <- rbind( seqmeta, c('tmp',
+                             NA, NA, NA, NA,
+                             NA, NA, NA, NA,
+                             NA, NA, NA, NA))
+
+# Initialize Graph
+seqnet <- graph_from_data_frame(allpair.df, directed = FALSE, seqmeta)
+  seqnet <- delete_vertices(seqnet, 'tmp')
+  seqmeta <- seqmeta[ (seqmeta$retrieved != "tmp"), ]
+  
+# Assign meta-data components
+V(seqnet)$component2 <- (components(seqnet)$membership)
+
+```
+
+
+```{r}
+# Cytoscape Visualization
+createNetworkFromIgraph(seqnet, title="plasticome2", collection = "seqnet")
+layoutNetwork(paste('force-directed',
+                    'defaultEdgeWeight=3',
+                    'defaultSpringCoefficient=5E-5',
+                    'defaultSpringLength=80',
+                    sep = ' '))
+# Manually set `Prefuse Force-Directed - by ID`
+# then         `Remove Overlap`
+
+```
+
+```{r}
+# Save a list of each of the components into a seperate file for HMM 
+# construction
+
+# mkdir -p list
+
+for (i in 1:max(V(seqnet)$component2)) {
+  component.genename <- V(seqnet)$gene[ V(seqnet)$component2 == i ][1]
+  accession.list <- V(seqnet)$name[ V(seqnet)$component2 == i ]
+  
+  write.table( accession.list, file = paste0( 'hmm/list/',
+                                              'c',i,"-",
+                                              component.genename,
+                                              '.list'),
+              quote = F, row.names = F, col.names = F )
+}
+
+# BASH
+# # Extract all sequences of a component
+# mkdir -p hmm
+# mkdir -p msa
+# mkdir -p fa
+# 
+# for i in $(seq 1 26);
+# do
+# 	component=$(ls list/c"$i"-* | sed 's/.list//g' - | sed 's/list\///g' -)
+# 
+# 	seqkit grep -nr -f list/"$component"-*.list plasticome.v1.fa \
+# 	  > fa/"$component".fa
+# 
+# 	muscle -align fa/"$component".fa -output msa/"$component".msa.fa
+# 
+# 	hmmbuild hmm/"$component".hmm msa/"$component".msa.fa
+# done
+
+
+```
+
+```{r}
+save(seqmeta, seqnet, file = "net/plasticome.network.Rdata")
+```
+
+```{r}
+# Profile Profile comparison network
+# Import all v all alignment as edges
+profile.aln <- read.csv(file = 'hmm/hmmalign.all.tsv', header = F, sep = ' ')
+
+colnames(profile.aln) <- c('ci','cj', 'No', 'Hit','Prob','E-value','P-value','Score',
+                           'SS','Cols','Query_HMM','Template_HMM', "Template_len")
+
+# Initialize Graph
+hmmnet <- graph_from_data_frame(profile.aln, directed = TRUE)
+
+# Cytoscape Visualization
+createNetworkFromIgraph(hmmnet, title="hmmnet", collection = "seqnet")
+layoutNetwork(paste('force-directed',
+                    'defaultEdgeWeight=3',
+                    'defaultSpringCoefficient=5E-5',
+                    'defaultSpringLength=80',
+                    sep = ' '))
+# Manually set `Prefuse Force-Directed - by ID`
+# then         `Remove Overlap`
+
+```
+
+```{r}
+# # Build minimal set of HMM to detect all PAZy
+# 
+# # PFAM
+# # init
+# model='Pfam-A'
+# hmmpress "$model".hmm
+# 
+# # scan
+# hmmscan \
+#   --tblout "$model".pv1.tbl \
+#   --notextw \
+#   -o "$model".hmmout --noali --max \
+#   "$model".hmm ../../plasticome.v1.fa 
+# 
+
+# Sequence-Pfam comparison network
+# Import HMMER PFAM search of plasticome
+pfam.aln <- read.table(file = 'hmm/pfam/Pfam-A.pv1.tbl', header = F)
+
+colnames(pfam.aln) <- c('target_name', 'accession', 'query_name',
+                        'accession', 'e-value', 'score', 'bias',
+                        'dom_E-value', 'dom_score', 'dom_ bias',
+                        'exp','reg','clu','ov','env','dom','rep','inc')
+
+pfam.aln <- pfam.aln[,c('accession', 'query_name',
+                        'e-value', 'score', 'bias',
+                        'dom_E-value', 'dom_score', 'dom_ bias',
+                        'exp','reg','clu','ov','env','dom','rep','inc', 'target_name')]
+
+pfam.aln$escore <- -log10(pfam.aln$`e-value`)
+pfam.aln <- pfam.aln[ (pfam.aln$`e-value` <= 1e-5) , ]
+pfam.aln$escore[ is.infinite(pfam.aln$escore) ] <- 100
+  
+# Initialize Graph
+pfamnet <- graph_from_data_frame(pfam.aln, directed = TRUE)
+V(pfamnet)$model <- FALSE
+V(pfamnet)$model[grep('^PF', V(pfamnet)$name, F, F)] <- TRUE
+
+# Cytoscape Visualization
+createNetworkFromIgraph(pfamnet, title="pfam_plasticome_allHits", collection = "pfamnet")
+# Manually set `Prefuse Force-Directed - by ID`
+# then         `Remove Overlap`
+
+```
+
+
+```{r}
+## PFAM SELECT
+## Minimal set of PFAM models hitting the span of PAZy
+# PF00082.hmm
+# PF00089.hmm
+# PF00144.hmm
+# PF00561.hmm
+# PF01083.hmm
+# PF01425.hmm
+# PF01522.hmm
+# PF01674.hmm
+# PF01738.hmm
+# PF02983.hmm
+# PF03403.hmm
+# PF03576.hmm
+# PF06850.hmm
+# PF07224.hmm
+# PF07732.hmm
+# PF09995.hmm
+# PF10503.hmm
+# PF10605.hmm
+# PF12146.hmm
+# PF12695.hmm
+# PF13472.hmm
+# PF20434.hmm
+# PF21419.hmm
+# PF24708.hmm
+
+# # Sequences with no sig PFAM HMM model hit
+# # H6N162
+# # H6N4Z1
+# # Q3L8N0.2
+# # QZD35498.1
+# # QZD35499.1
+# # WP_039353427.1
+# # WP_277688239.1
+# # XCO66867.1
+# # ASA57064.1
+# # MBQ0729274.1
+# # ODU60407.1
+# # P19833.1
+# # RLT92980.1
+# # RLU00646.1
+# # SUD16364.1
+# # WP_068824797.1
+# # WP_085749238.1
+# # WP_101893509.1
+# # AKJ87264.1
+# # BAG32152.1
+# # KFJ10595.1
+# # Q0K9H3.1
+# # P41365
+# # AKJ87250.1
+
+
+# # PLASTICOME Update HMM Models
+# 
+# ## PF00561.26
+# # P41365
+# # hmmalign -o PF00561.append.ali pfam_mini/PF00561.hmm PF00561.append.fa 
+# # DOES NOT APPEND
+# 
+# ## PF20434.4
+# # AKJ87250.1
+# # DOES NOT APPEND
+# 
+# ## PF12146.14
+# # AKJ87264.1
+# # AAD22743.1
+# # AAF01331.1
+# # AAF66684.1
+# # AAY92471.1
+# # AAY92474.2
+# # hmmalign --trim -o PF12146.append.ali pfam_mini/PF12146.hmm PF12146.append.fa 
+# # DOES NOT APPEND
+
+
+# # Plastic HMM Selection from PFAM
+# # init
+# cat pfam_select/* > pfam_select.hmm
+# model='pfam_select'
+# hmmpress "$model".hmm
+# 
+# # scan
+# hmmscan \
+#   --tblout "$model".pv1.tbl \
+#   --notextw \
+#   -o "$model".pv1.hmmout --noali --max \
+#   "$model".hmm ../../plasticome.v1.fa
+
+## Create HMM statistics File
+# hmmstat pfam_select.hmm \
+# \| sed 's/  */\t/g' - \
+# \| sed '/^#/d' - > $model.meta
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
