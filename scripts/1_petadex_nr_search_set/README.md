@@ -1,8 +1,7 @@
 # `petadex-nr` "v2" — Plastic-degrading Enzyme Search Set
 
-This directory builds the **`petadex-nr`** search query set;
-which is stored as a file called **`petadex.v2.RData`**.
-This is a curated, clustered, and annotated index of plastic-degrading ("plasticase") enzymes.
+This directory builds the **`petadex-nr`** search query for
+the `Logan` project also called `petadex.v2` set.
 
 Starting from a manually curated set of reference enzymes (PAZy / "plasticome v1"),
  the workflow searches the NCBI `nr` protein database for homologs,
@@ -16,8 +15,9 @@ analysis and visualization.
 > Early files use the `plasticome` prefix and later files use `petadex`;
 > they are stages of the same pipeline.
 >
-> (2) The output of `petadex-nr` search set is a file called **`petadex-nr.RData`**
-> but in the scripts this file may be referenced as **`petadex.v2.RData`**.
+> (2) The output of `petadex-nr` search set are files called
+> **`petadex.v2.fa`**  and **`petadex.v2.RData`**
+> the former is the input for the `logan-diamond` search of `Logan v1.1` data
 
 ---
 
@@ -107,7 +107,7 @@ Loading this file (`load("petadex.v2.RData")`) restores:
 | `petadex.pre2.pz.pro` | Hits re-mapped to references (component/gene assignment). |
 | `pfam.meta` | Statistics for the selected Pfam HMM models. |
 
-The companion FASTA `blast/petadex.v2.fa` (~1.05M proteins, 306 Mb of residues)
+The companion FASTA `petadex.v2.fa` (~1.05M proteins, 306 Mb of residues)
 is the sequence database keyed by the `petadex.kv` naming scheme.
 
 ---
