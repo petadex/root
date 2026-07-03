@@ -1,0 +1,11 @@
+split-fasta logan_vs_nr_amidase-signature.unmapped2.clust.reps.faa 5000000 split-amidase-signature seqs
+split-fasta logan_vs_nr_abhydrolase.unmapped2.clust.reps.faa 5000000000 split-abhydrolase seqs
+split-fasta logan_vs_nr_betalactamase.unmapped2.clust.reps.faa 50000000 split-betalactamase seqs
+split-fasta logan_vs_nr_trypsin-like.unmapped2.clust.reps.faa 5000000000 split-trypsin-like seqs
+split-fasta logan_vs_nr_arylesterase.unmapped2.clust.reps.faa 5000000000 split-arylesterase seqs
+split-fasta logan_vs_nr_cupredoxins.unmapped2.clust.reps.faa 5000000000 split-cupredoxins seqs
+split-fasta logan_vs_nr_cyclase-like.unmapped2.clust.reps.faa 5000000000 split-cyclase-like seqs
+split-fasta logan_vs_nr_cytochromec-like.unmapped2.clust.reps.faa 5000000000 split-cytochromec-like seqs
+split-fasta logan_vs_nr_d-ala-esterase.unmapped2.clust.reps.faa 5000000000 split-d-ala-esterase seqs
+split-fasta logan_vs_nr_oxygenase-like.unmapped2.clust.reps.faa 5000000000 split-oxygenase-like seqs
+split-fasta logan_vs_nr_uridase-like.unmapped2.clust.reps.faa 5000000000 split-uridase-like seqs
