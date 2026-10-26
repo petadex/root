@@ -1,0 +1,3 @@
+[submodule "petadex-v2/plasticome"]
+	path = petadex-v2/plasticome
+	url = https://github.com/Pixeldom4/plasticome.git
